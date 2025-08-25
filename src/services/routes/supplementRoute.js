@@ -1,0 +1,1 @@
+export const GET_SUPPLEMENT_ENDPOINT = "v1/items/public/fetch-all";

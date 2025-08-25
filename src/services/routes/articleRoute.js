@@ -1,0 +1,1 @@
+export const FETCH_ARTICLE_ENDPOINT = "v1/web-content/public/get-article-with-pagination?page=0&size=4";

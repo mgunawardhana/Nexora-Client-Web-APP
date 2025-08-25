@@ -1,6 +1,6 @@
 import React from "react";
 // Using a placeholder for the image, you can replace it with your own HR-themed image.
-import image from "./../assets/Flux_Schnell_A_highly_detailed_and_realistic_scene_of_a_vibran_3 (2).jpeg";
+import image from "./../assets/studio-arrangement-work.jpg";
 export default function FooterSection() {
     return (<div>
         {/* Video Banner Section */}

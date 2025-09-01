@@ -42,8 +42,7 @@ export default function LoginPage({ onLogin }) {
         return newErrors;
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleSubmit = async () => {
 
         const formErrors = validateForm();
         if (Object.keys(formErrors).length > 0) {
@@ -55,20 +54,50 @@ export default function LoginPage({ onLogin }) {
         setErrors({});
 
         try {
-            // Simulate API call - replace with your actual authentication logic
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
-            // For demo purposes, accept any valid email/password combo
-            if (credentials.email && credentials.password) {
-                onLogin({
+            const response = await fetch('http://localhost:8080/api/v1/auth/authenticate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzYXNtaXRoYUBnbWFpbC5jb20iLCJpYXQiOjE3MzcyNTc2NjEsImV4cCI6MTczNzM0NDA2MX0.ndBME0LV9Fzdt7TtqyjUrs-XvOxgF1Xav0pDcIefKsU'
+                },
+                body: JSON.stringify({
                     email: credentials.email,
-                    loginTime: new Date().toISOString()
-                });
-            } else {
-                throw new Error('Invalid credentials');
+                    password: credentials.password
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Authentication failed');
             }
+
+            const data = await response.json();
+
+            // Store user data in localStorage (replace with React state for Claude.ai artifacts)
+            // In your own environment, uncomment these lines:
+            // localStorage.setItem('access_token', data.access_token);
+            // localStorage.setItem('refresh_token', data.refresh_token);
+            // localStorage.setItem('user_name', data.user_name);
+            // localStorage.setItem('role', data.role);
+            // localStorage.setItem('email', data.email);
+
+            // For demo purposes, we'll use React state
+            const userData = {
+                accessToken: data.access_token,
+                refreshToken: data.refresh_token,
+                userName: data.user_name,
+                role: data.role,
+                email: data.email,
+                loginTime: new Date().toISOString()
+            };
+
+            // Call the onLogin callback with user data
+            onLogin(userData);
+
         } catch (error) {
-            setErrors({ general: 'Invalid email or password. Please try again.' });
+            console.error('Login error:', error);
+            setErrors({
+                general: 'Invalid email or password. Please check your credentials and try again.'
+            });
         } finally {
             setIsLoading(false);
         }
@@ -110,12 +139,12 @@ export default function LoginPage({ onLogin }) {
                             </button>
                         </div>
 
-                        <h2 className="text-3xl font-bold text-gray-900">Wellcome!</h2>
+                        <h2 className="text-3xl font-bold text-gray-900">Welcome!</h2>
                         <p className="mt-2 text-sm text-gray-600">Please enter your details to login.</p>
                     </div>
 
                     {/* Login Form */}
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="space-y-6">
                         {/* General Error Message */}
                         {errors.general && (
                             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
@@ -183,7 +212,8 @@ export default function LoginPage({ onLogin }) {
 
                         {/* Login Button */}
                         <button
-                            type="submit"
+                            type="button"
+                            onClick={handleSubmit}
                             disabled={isLoading}
                             className="w-full bg-gray-900 text-white py-3 px-4 rounded-lg hover:bg-gray-800 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                         >
@@ -255,7 +285,7 @@ export default function LoginPage({ onLogin }) {
                                 Continue with Wallet
                             </button>
                         </div>
-                    </form>
+                    </div>
 
                     {/* Footer */}
                     <div className="mt-8 text-center">

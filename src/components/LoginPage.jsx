@@ -74,11 +74,11 @@ export default function LoginPage({ onLogin }) {
 
             // Store user data in localStorage (replace with React state for Claude.ai artifacts)
             // In your own environment, uncomment these lines:
-            // localStorage.setItem('access_token', data.access_token);
-            // localStorage.setItem('refresh_token', data.refresh_token);
-            // localStorage.setItem('user_name', data.user_name);
-            // localStorage.setItem('role', data.role);
-            // localStorage.setItem('email', data.email);
+            localStorage.setItem('access_token_web', data.access_token);
+            localStorage.setItem('refresh_token_web', data.refresh_token);
+            localStorage.setItem('user_name_web', data.user_name);
+            localStorage.setItem('role_web', data.role);
+            localStorage.setItem('email_web', data.email);
 
             // For demo purposes, we'll use React state
             const userData = {

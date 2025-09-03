@@ -8,8 +8,118 @@ export default function TopRatedServices() {
     const [isScanning, setIsScanning] = useState(false);
     const [cameraError, setCameraError] = useState(null);
     const [scannedData, setScannedData] = useState(null);
+    const [attendanceStatus, setAttendanceStatus] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
+
+    // Function to determine attendance action based on current time
+    const getAttendanceAction = () => {
+        const now = new Date();
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        const currentTime = hours + minutes / 60;
+
+        if (currentTime >= 0 && currentTime <= 9.5) {
+            return 'checkIn';
+        } else if (currentTime >= 12 && currentTime < 13) {
+            return 'lunchOut';
+        } else if (currentTime >= 13 && currentTime <= 14) {
+            return 'lunchIn';
+        } else if (currentTime >= 16 && currentTime <= 17) {
+            return 'checkOut';
+        }
+        return null;
+    };
+
+    // Function to format current time for API
+    const getCurrentTimeString = () => {
+        const now = new Date();
+        return now.toISOString().slice(0, 19); // Format: YYYY-MM-DDTHH:mm:ss
+    };
+
+    const getStoredCredentials = () => {
+        const email = localStorage.getItem('email_web');
+        const accessToken = localStorage.getItem('access_token_web');
+        const refreshToken = localStorage.getItem('refresh_token_web');
+
+        return { email, accessToken, refreshToken };
+    };
+
+    // Function to mark attendance
+    const markAttendance = async (action, scanTime) => {
+        try {
+            setIsSubmitting(true);
+            const { email, accessToken } = getStoredCredentials();
+
+            if (!email || !accessToken) {
+                throw new Error('Missing email or access token in localStorage');
+            }
+
+            // Prepare attendance data based on action
+            const attendanceData = {
+                userId: 7, // You might want to get this from localStorage too
+                attendanceStatus: "PRESENT",
+                checkInTime: "",
+                lunchOutTime: "",
+                lunchInTime: "",
+                checkOutTime: "",
+                notes: `${action} via QR scan`,
+                email: email
+            };
+
+            // Set the appropriate time field based on action
+            switch (action) {
+                case 'checkIn':
+                    attendanceData.checkInTime = scanTime;
+                    break;
+                case 'lunchOut':
+                    attendanceData.lunchOutTime = scanTime;
+                    break;
+                case 'lunchIn':
+                    attendanceData.lunchInTime = scanTime;
+                    break;
+                case 'checkOut':
+                    attendanceData.checkOutTime = scanTime;
+                    break;
+                default:
+                    throw new Error('Invalid attendance action');
+            }
+
+            const response = await fetch('http://localhost:8080/api/v1/attendance/mark-attendance', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`
+                },
+                body: JSON.stringify(attendanceData)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            console.log('Attendance marked successfully:', result);
+
+            setAttendanceStatus({
+                success: true,
+                action: action,
+                time: scanTime,
+                message: `${action} marked successfully!`
+            });
+
+        } catch (error) {
+            console.error('Error marking attendance:', error);
+            setAttendanceStatus({
+                success: false,
+                action: action,
+                message: `Failed to mark ${action}: ${error.message}`
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     // Effect to start/stop camera based on isScanning state
     useEffect(() => {
@@ -29,9 +139,10 @@ export default function TopRatedServices() {
         try {
             setCameraError(null);
             setScannedData(null); // Reset previous scan data
+            setAttendanceStatus(null); // Reset attendance status
             console.log("Requesting camera access...");
 
-            // **MODIFIED: Added advanced constraints for autofocus**
+            // Advanced constraints for autofocus
             const constraints = {
                 video: {
                     width: { ideal: 1280 },
@@ -53,7 +164,7 @@ export default function TopRatedServices() {
                         setCameraError("Failed to play video stream.");
                         stopCamera();
                     });
-                    // **NEW: Start the QR scanning loop**
+                    // Start the QR scanning loop
                     requestAnimationFrame(scanQRCode);
                 };
             }
@@ -79,8 +190,8 @@ export default function TopRatedServices() {
         }
     };
 
-    // **NEW: Function to scan for QR codes in the video feed**
-    const scanQRCode = () => {
+    // Function to scan for QR codes in the video feed
+    const scanQRCode = async () => {
         // Stop scanning if the state is no longer active or refs are not set
         if (!isScanning || !videoRef.current || !canvasRef.current) {
             return;
@@ -105,6 +216,20 @@ export default function TopRatedServices() {
                 console.log("QR Code detected:", code.data);
                 setScannedData(code.data);
                 setIsScanning(false); // Stop scanning after a successful scan
+
+                // Automatically determine attendance action and mark attendance
+                const action = getAttendanceAction();
+                if (action) {
+                    const scanTime = getCurrentTimeString();
+                    await markAttendance(action, scanTime);
+                } else {
+                    setAttendanceStatus({
+                        success: false,
+                        action: 'invalid_time',
+                        message: 'QR scan is outside valid attendance hours'
+                    });
+                }
+
                 return; // Exit the loop
             }
         }
@@ -112,7 +237,6 @@ export default function TopRatedServices() {
         // Continue scanning on the next frame
         requestAnimationFrame(scanQRCode);
     };
-
 
     const handleCardClick = (card) => {
         setSelectedCard(card);
@@ -172,7 +296,7 @@ export default function TopRatedServices() {
                     <h1 className="text-4xl font-bold">HR Registry QR Code Scanner System</h1>
                     <p className="text-lg text-gray-600">Streamline employee verification and access management with advanced QR code scanning technology.</p>
                 </div>
-                <div className="lg:flex items-center justify-between py-16 gap-12">
+                <div className="lg:flex items-start justify-between py-16 gap-12">
                     <div className="lg:w-1/2 space-y-8">
                         <div>
                             <span className="bg-[#ffa502] text-white px-3 py-1 rounded-xl">01</span>
@@ -199,15 +323,17 @@ export default function TopRatedServices() {
                             <button
                                 className="bg-[#ffa502] text-white px-6 py-3 rounded-xl shadow hover:bg-white hover:text-[#ffa502] border border-transparent hover:border-[#ffa502] transition-colors duration-300"
                                 onClick={() => setIsScanning(prev => !prev)}
-                                disabled={isScanning}
+                                disabled={isScanning || isSubmitting}
                             >
-                                {isScanning ? 'Scanning...' : 'Start QR Scanner'}
+                                {isScanning ? 'Scanning...' : isSubmitting ? 'Processing...' : 'Start QR Scanner'}
                             </button>
-                            {/* **NEW: Reset button for after a scan** */}
-                            {scannedData && (
+                            {(scannedData || attendanceStatus) && (
                                 <button
                                     className="bg-gray-600 text-white px-6 py-3 rounded-xl shadow hover:bg-gray-700 transition-colors duration-300"
-                                    onClick={() => setScannedData(null)}
+                                    onClick={() => {
+                                        setScannedData(null);
+                                        setAttendanceStatus(null);
+                                    }}
                                 >
                                     Reset Scanner
                                 </button>
@@ -216,18 +342,52 @@ export default function TopRatedServices() {
                                 View HR Registry
                             </button>
                         </div>
-                        {/* **NEW: Display scanned data** */}
+
+                        {/* Display scanned data and attendance status */}
                         {scannedData && (
-                            <div className="mt-6 p-4 bg-green-100 border border-green-400 text-green-800 rounded-lg">
-                                <h3 className="font-bold text-lg">Scan Successful!</h3>
+                            <div className="mt-6 p-4 bg-blue-100 border border-blue-400 text-blue-800 rounded-lg">
+                                <h3 className="font-bold text-lg">QR Code Scanned</h3>
                                 <p className="break-words"><strong>Data:</strong> {scannedData}</p>
                             </div>
                         )}
+
+                        {attendanceStatus && (
+                            <div className={`mt-4 p-4 rounded-lg ${
+                                attendanceStatus.success
+                                    ? 'bg-green-100 border border-green-400 text-green-800'
+                                    : 'bg-red-100 border border-red-400 text-red-800'
+                            }`}>
+                                <h3 className="font-bold text-lg">
+                                    {attendanceStatus.success ? 'Success' : ' Error'}
+                                </h3>
+                                <p>{attendanceStatus.message}</p>
+                                {attendanceStatus.time && (
+                                    <p className="text-sm mt-1">
+                                        <strong>Time:</strong> {new Date(attendanceStatus.time).toLocaleString()}
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Display current time and valid attendance windows */}
+                        <div className="mt-6 p-4 bg-gray-100 border border-gray-300 text-gray-700 rounded-lg">
+                            <h3 className="font-bold text-lg mb-2">Current Time & Attendance Windows</h3>
+                            <p><strong>Current Time:</strong> {new Date().toLocaleTimeString()}</p>
+                            <div className="mt-2 text-sm">
+                                <p><strong>Valid Scan Times:</strong></p>
+                                <ul className="list-disc list-inside ml-4 mt-1">
+                                    <li>Check In: 8:00 AM - 9:30 AM</li>
+                                    <li>Lunch Out: 12:00 PM - 1:00 PM</li>
+                                    <li>Lunch In: 1:00 PM - 2:00 PM</li>
+                                    <li>Check Out: 4:00 PM - 5:00 PM</li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
-                    <div className="lg:w-1/2 overflow-hidden rounded-2xl mt-8 lg:mt-0">
-                        {/* **NEW: Added canvas element for jsQR (hidden from view)** */}
+                    <div className="lg:w-1/2 flex items-start mt-8 lg:mt-0">
+                        {/* Canvas element for jsQR (hidden from view) */}
                         <canvas ref={canvasRef} style={{ display: 'none' }} />
-                        <div className="relative bg-gray-900 rounded-2xl min-h-[500px] h-full flex items-center justify-center">
+                        <div className="relative bg-gray-900 rounded-2xl min-h-[500px] w-full flex items-center justify-center">
                             {isScanning && (
                                 <video
                                     ref={videoRef}
